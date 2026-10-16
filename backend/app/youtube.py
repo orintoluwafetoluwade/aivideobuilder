@@ -41,7 +41,8 @@ def callback(code: str = Query(...), state: str = Query(...)):
     try:
         from cryptography.fernet import Fernet
         token = Fernet(settings.youtube_token_encryption_key.encode()).encrypt(flow.credentials.to_json().encode()).decode()
-        Path("./data/youtube-token.enc").write_text(token, encoding="utf-8")
+        settings.youtube_token_path.parent.mkdir(parents=True, exist_ok=True)
+        settings.youtube_token_path.write_text(token, encoding="utf-8")
         return RedirectResponse(settings.frontend_url + "/?youtube=connected")
     except Exception as exc:
         raise HTTPException(500, "Secure token storage failed. Check the Fernet encryption key.") from exc
@@ -52,7 +53,7 @@ def upload(file_path: str, title: str, description: str = "", privacy_status: st
         raise HTTPException(400, "Invalid privacy status.")
     if privacy_status == "public":
         raise HTTPException(400, "Public publishing is disabled until an explicit confirmation flow is implemented.")
-    token = Path("./data/youtube-token.enc")
+    token = settings.youtube_token_path
     if not token.exists() or not settings.youtube_token_encryption_key:
         raise HTTPException(409, "Connect a YouTube channel first.")
     try:
