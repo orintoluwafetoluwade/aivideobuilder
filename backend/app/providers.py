@@ -8,7 +8,7 @@ from .config import settings
 def integrations():
     return {
         "gemini": bool(settings.gemini_api_key),
-        "imagen": bool(settings.google_cloud_project and settings.google_application_credentials),
+        "imagen": bool(settings.gemini_api_key or (settings.google_cloud_project and settings.google_application_credentials)),
         "text_to_speech": bool(settings.google_tts_api_key or settings.google_application_credentials),
         "youtube": bool(settings.youtube_client_id and settings.youtube_client_secret),
         "firestore": bool(settings.firebase_project_id and settings.firebase_service_account_json),
@@ -157,8 +157,12 @@ def render(project_id, scenes, fmt):
         if not image.is_file():
             image = folder / f"scene-{index}.png"
             if not image.exists():
+                # Never silently create a plain blank frame when image generation fails.
+                # Make a visible, labelled scene card as a last-resort fallback.
                 run_ffmpeg([ffmpeg, "-y", "-f", "lavfi", "-i",
-                    f"color=c=0x111e2a:s={width}x{height}:d=1", "-frames:v", "1", str(image)], 30)
+                    f"color=c=0x111e2a:s={width}x{height}:d=1",
+                    "-vf", f"drawbox=x=iw*0.08:y=ih*0.08:w=iw*0.84:h=ih*0.84:color=0x1b3545:t=6,drawtext=text='SCENE {index}':fontcolor=white:fontsize=54:x=(w-text_w)/2:y=(h-text_h)/2",
+                    "-frames:v", "1", str(image)], 30)
         audio = Path(scene.get("audio_path") or "")
         segment = folder / f"segment-{index:02}.mp4"
         duration = max(2, float(scene.get("duration", 8)))
