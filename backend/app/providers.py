@@ -115,18 +115,27 @@ def render(project_id, scenes, fmt):
     folder.mkdir(parents=True, exist_ok=True)
     output_dir = Path(settings.render_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    width, height = (1080, 1920) if fmt == "YouTube Shorts" else (1920, 1080)
+    # Render at 720p to stay within the memory limits of small/free containers.
+    width, height = (720, 1280) if fmt == "YouTube Shorts" else (1280, 720)
     if not scenes:
         raise RuntimeError("No scenes to render.")
     segments = []
+
+    def run_ffmpeg(command, timeout):
+        try:
+            subprocess.run(command, check=True, capture_output=True, timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("FFmpeg timed out while rendering. Try a shorter video.") from exc
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or b"").decode("utf-8", errors="replace")[-1200:]
+            raise RuntimeError("FFmpeg could not render this video: " + (detail or str(exc))) from exc
     for index, scene in enumerate(scenes, 1):
         image = Path(scene.get("image_path") or "")
         if not image.is_file():
             image = folder / f"scene-{index}.png"
             if not image.exists():
-                subprocess.run([ffmpeg, "-y", "-f", "lavfi", "-i",
-                    f"color=c=0x111e2a:s={width}x{height}:d=1", "-frames:v", "1", str(image)],
-                    check=True, capture_output=True)
+                run_ffmpeg([ffmpeg, "-y", "-f", "lavfi", "-i",
+                    f"color=c=0x111e2a:s={width}x{height}:d=1", "-frames:v", "1", str(image)], 30)
         audio = Path(scene.get("audio_path") or "")
         segment = folder / f"segment-{index:02}.mp4"
         duration = max(2, float(scene.get("duration", 8)))
@@ -140,16 +149,17 @@ def render(project_id, scenes, fmt):
                         f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={duration}"]
         command += ["-t", str(duration), "-vf",
             f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},format=yuv420p",
-            "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+            "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1",
+            "-filter_threads", "1", "-pix_fmt", "yuv420p",
             "-map", "0:v:0", "-map", "1:a:0", "-c:a", "aac", "-ar", "44100",
             "-ac", "2", "-shortest"]
-        subprocess.run(command + [str(segment)], check=True, capture_output=True)
+        run_ffmpeg(command + [str(segment)], int(duration) + 90)
         segments.append(segment)
     listing = folder / "concat.txt"
     listing.write_text("\n".join("file '" + path.as_posix() + "'" for path in segments), encoding="utf-8")
     output = output_dir / f"{project_id}.mp4"
-    subprocess.run([ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
-                    "-c", "copy", "-movflags", "+faststart", str(output)], check=True, capture_output=True)
+    run_ffmpeg([ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
+                    "-c", "copy", "-movflags", "+faststart", str(output)], 120)
     return "/renders/" + output.name
 
 def mirror(project):
