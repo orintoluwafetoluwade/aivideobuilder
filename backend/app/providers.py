@@ -22,13 +22,30 @@ async def storyboard(topic, style, fmt, minutes):
 Topic: {topic}
 Style: {style}
 Return ONLY JSON with a scenes array. Each scene has title, narration (spoken words), visual_prompt (detailed image prompt with consistent visual continuity), and duration in seconds. Create 4-12 scenes totalling close to {minutes * 60} seconds. Do not include text in images."""
+    # Normalize the configured model name so capitalization or a leading
+    # "models/" prefix cannot produce an invalid Gemini REST endpoint.
+    configured_model = settings.gemini_model.strip().lower()
+    if configured_model.startswith("models/"):
+        configured_model = configured_model[len("models/"):]
+    # Gemini 2.5 Flash may return 404 for newer API projects; retry once with
+    # the newer Flash-Lite model if the configured model is no longer available.
+    models_to_try = [configured_model]
+    if configured_model == "gemini-2.5-flash":
+        models_to_try.append("gemini-3.5-flash-lite")
+
     async with httpx.AsyncClient(timeout=90) as client:
-        response = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent",
-            params={"key": settings.gemini_api_key},
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"responseMimeType": "application/json", "temperature": 0.7}},
-        )
+        response = None
+        for model in models_to_try:
+            candidate = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                params={"key": settings.gemini_api_key},
+                json={"contents": [{"parts": [{"text": prompt}]}],
+                      "generationConfig": {"responseMimeType": "application/json", "temperature": 0.7}},
+            )
+            if candidate.status_code == 404 and model != models_to_try[-1]:
+                continue
+            response = candidate
+            break
         response.raise_for_status()
         raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(raw)
