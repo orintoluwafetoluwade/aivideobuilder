@@ -1,1 +1,32 @@
-services:\n  api:\n    build: ./backend\n    env_file: .env\n    ports: ["8000:8000"]\n    volumes:\n      - studio-data:/app/data\n      - studio-media:/app/media\n      - studio-renders:/app/renders\n    healthcheck:\n      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n  web:\n    image: node:20-alpine\n    working_dir: /app\n    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"\n    environment:\n      VITE_API_BASE_URL: http://localhost:8000/api\n    ports: ["5173:5173"]\n    volumes:\n      - ./:/app\n      - web-node-modules:/app/node_modules\n    depends_on:\n      api:\n        condition: service_healthy\nvolumes:\n  studio-data:\n  studio-media:\n  studio-renders:\n  web-node-modules:\n
+services:
+  api:
+    build: ./backend
+    env_file: .env
+    ports: ["8000:8000"]
+    volumes:
+      - studio-data:/app/data
+      - studio-media:/app/media
+      - studio-renders:/app/renders
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+    ports: ["5173:5173"]
+    volumes:
+      - ./:/app
+      - web-node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  studio-data:
+  studio-media:
+  studio-renders:
+  web-node-modules:

@@ -1,1 +1,11 @@
-node_modules/\ndist/\n.venv/\n__pycache__/\n*.py[cod]\n.pytest_cache/\n.env\n!.env.example\ndata/\nmedia/\nrenders/\n
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+!.env.example
+data/
+media/
+renders/

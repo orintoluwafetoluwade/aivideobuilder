@@ -1,1 +1,8 @@
-{\n  "firestore": { "rules": "firestore.rules" },\n  "hosting": { "public": "dist", "ignore": ["firebase.json", "**/.*", "**/node_modules/**"], "rewrites": [{ "source": "**", "destination": "/index.html" }] }\n}
+{
+  "firestore": { "rules": "firestore.rules" },
+  "hosting": {
+    "public": "dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  }
+}

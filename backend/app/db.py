@@ -1,1 +1,50 @@
-import json,sqlite3\nfrom pathlib import Path\nfrom contextlib import contextmanager\nfrom .config import settings\ndef db_path():\n u=settings.database_url\n if not u.startswith('sqlite:///'): raise RuntimeError('This starter supports SQLite only; configure a database adapter before using a non-SQLite DATABASE_URL.')\n p=u.removeprefix('sqlite:///');Path(p).parent.mkdir(parents=True,exist_ok=True);return p\n@contextmanager\ndef connection():\n c=sqlite3.connect(db_path(),timeout=30);c.row_factory=sqlite3.Row\n try: yield c;c.commit()\n finally:c.close()\ndef init_db():\n with connection() as c:c.execute('CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY,title TEXT NOT NULL,topic TEXT NOT NULL,style TEXT NOT NULL,format TEXT NOT NULL,duration_minutes INTEGER NOT NULL,status TEXT NOT NULL,scenes_json TEXT NOT NULL DEFAULT \'[]\',render_url TEXT,error TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)')\ndef encode(row):\n d=dict(row);d['scenes']=json.loads(d.pop('scenes_json','[]'));return d\ndef update(pid,**values):\n allowed={'status','render_url','error','scenes_json'};v={k:(json.dumps(x) if k=='scenes_json' and not isinstance(x,str) else x) for k,x in values.items() if k in allowed}\n if not v:return\n from datetime import datetime,timezone\n v['updated_at']=datetime.now(timezone.utc).isoformat();sql=', '.join(k+'=?' for k in v)\n with connection() as c:c.execute(f'UPDATE projects SET {sql} WHERE id=?',(*v.values(),pid))
+import json
+import sqlite3
+from contextlib import contextmanager
+from pathlib import Path
+from datetime import datetime, timezone
+from .config import settings
+
+def db_path() -> str:
+    url = settings.database_url
+    if not url.startswith("sqlite:///"):
+        raise RuntimeError("This starter supports SQLite only; configure a database adapter before using a non-SQLite DATABASE_URL.")
+    path = url.removeprefix("sqlite:///")
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+@contextmanager
+def connection():
+    conn = sqlite3.connect(db_path(), timeout=30)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+def init_db():
+    with connection() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY, title TEXT NOT NULL, topic TEXT NOT NULL, style TEXT NOT NULL,
+            format TEXT NOT NULL, duration_minutes INTEGER NOT NULL, status TEXT NOT NULL,
+            scenes_json TEXT NOT NULL DEFAULT '[]', render_url TEXT, error TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )""")
+
+def encode(row):
+    result = dict(row)
+    result["scenes"] = json.loads(result.pop("scenes_json", "[]"))
+    return result
+
+def update(project_id: str, **values):
+    allowed = {"status", "render_url", "error", "scenes_json"}
+    fields = {k: json.dumps(v) if k == "scenes_json" and not isinstance(v, str) else v
+              for k, v in values.items() if k in allowed}
+    if not fields:
+        return
+    fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    assignments = ", ".join(f"{key}=?" for key in fields)
+    with connection() as conn:
+        conn.execute(f"UPDATE projects SET {assignments} WHERE id=?",
+                     (*fields.values(), project_id))

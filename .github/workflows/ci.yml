@@ -1,1 +1,31 @@
-name: CI\non:\n  push:\n    branches: [main, "feature/**"]\n  pull_request:\n    branches: [main]\njobs:\n  frontend:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 20\n      - run: npm install\n      - run: npm run build\n      - run: npm test\n  backend:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        working-directory: backend\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.12"\n          cache: pip\n          cache-dependency-path: backend/requirements.txt\n      - run: pip install -r requirements.txt\n      - run: PYTHONPATH=. pytest -q\n
+name: CI
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
