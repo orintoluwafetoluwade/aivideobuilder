@@ -1,11 +1,13 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     app_env: str = "development"
     app_secret: str = "development-only-change-me"
     database_url: str = "sqlite:///./data/studio.db"
     cors_origins: str = "http://localhost:5173"
+    data_dir: str = "./data"
     media_dir: str = "./media"
     render_dir: str = "./renders"
     gemini_api_key: str = ""
@@ -28,9 +30,14 @@ class Settings(BaseSettings):
 
     @property
     def cors_list(self) -> list[str]:
-        return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
+        return [origin.strip().rstrip("/") for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def youtube_token_path(self) -> Path:
+        return Path(self.data_dir) / "youtube-token.enc"
+
 
 settings = Settings()
+Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
 Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
 Path(settings.render_dir).mkdir(parents=True, exist_ok=True)
-Path("./data").mkdir(exist_ok=True)
