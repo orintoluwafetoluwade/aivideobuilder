@@ -116,13 +116,16 @@ def render(project_id, scenes, fmt):
         command = [ffmpeg, "-y", "-loop", "1", "-i", str(image)]
         if audio.is_file():
             command += ["-i", str(audio)]
+        else:
+            # Keep every segment's stream layout identical so concat also works
+            # when a TTS provider is temporarily unavailable for one scene.
+            command += ["-f", "lavfi", "-i",
+                        f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={duration}"]
         command += ["-t", str(duration), "-vf",
             f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},format=yuv420p",
-            "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
-        if audio.is_file():
-            command += ["-map", "0:v:0", "-map", "1:a:0", "-c:a", "aac", "-shortest"]
-        else:
-            command += ["-an"]
+            "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+            "-map", "0:v:0", "-map", "1:a:0", "-c:a", "aac", "-ar", "44100",
+            "-ac", "2", "-shortest"]
         subprocess.run(command + [str(segment)], check=True, capture_output=True)
         segments.append(segment)
     listing = folder / "concat.txt"
