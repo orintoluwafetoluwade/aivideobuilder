@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: ai-video-studio-api
+    runtime: docker
+    plan: starter
+    region: ohio
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: ai-video-studio-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        value: sqlite:////var/data/studio.db
+      - key: DATA_DIR
+        value: /var/data
+      - key: MEDIA_DIR
+        value: /var/data/media
+      - key: RENDER_DIR
+        value: /var/data/renders
+      - key: CORS_ORIGINS
+        value: https://ai-video-studio-green-chi.vercel.app
+      - key: FRONTEND_URL
+        value: https://ai-video-studio-green-chi.vercel.app
+      - key: APP_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_TTS_API_KEY
+        sync: false
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: GOOGLE_CLOUD_LOCATION
+        value: us-central1
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/google-credentials.json
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REDIRECT_URI
+        sync: false
+      - key: YOUTUBE_TOKEN_ENCRYPTION_KEY
+        sync: false
