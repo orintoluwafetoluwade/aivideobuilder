@@ -2,27 +2,23 @@ services:
   - type: web
     name: ai-video-studio-api
     runtime: docker
-    plan: starter
+    plan: free
     region: ohio
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /api/health
     autoDeploy: true
-    disk:
-      name: ai-video-studio-data
-      mountPath: /var/data
-      sizeGB: 10
     envVars:
       - key: APP_ENV
         value: production
       - key: DATABASE_URL
-        value: sqlite:////var/data/studio.db
+        value: sqlite:////tmp/ai-video-studio-data/studio.db
       - key: DATA_DIR
-        value: /var/data
+        value: /tmp/ai-video-studio-data
       - key: MEDIA_DIR
-        value: /var/data/media
+        value: /tmp/ai-video-studio-data/media
       - key: RENDER_DIR
-        value: /var/data/renders
+        value: /tmp/ai-video-studio-data/renders
       - key: CORS_ORIGINS
         value: https://ai-video-studio-green-chi.vercel.app
       - key: FRONTEND_URL
