@@ -61,6 +61,9 @@ def upload(file_path: str, title: str, description: str = "", privacy_status: st
         credentials = Credentials.from_authorized_user_info(
             json.loads(Fernet(settings.youtube_token_encryption_key.encode()).decrypt(token.read_bytes())), SCOPES)
         path = Path(file_path).resolve()
+        render_root = Path(settings.render_dir).resolve()
+        if path.parent != render_root or path.suffix.lower() != ".mp4":
+            raise HTTPException(400, "Uploads must reference an MP4 in the configured render directory.")
         if not path.is_file():
             raise HTTPException(404, "Rendered video file not found.")
         service = build("youtube", "v3", credentials=credentials)
