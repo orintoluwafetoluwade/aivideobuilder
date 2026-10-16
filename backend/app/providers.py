@@ -49,16 +49,35 @@ Return ONLY JSON with a scenes array. Each scene has title, narration (spoken wo
         response.raise_for_status()
         raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(raw)
-    items = data.get("scenes", data if isinstance(data, list) else [])
+    # Gemini may return either {"scenes": [...]} or a bare JSON array.
+    # Only dictionaries support .get(); validate the shape before normalizing.
+    if isinstance(data, dict):
+        items = data.get("scenes", [])
+    elif isinstance(data, list):
+        items = data
+    else:
+        items = []
     if not isinstance(items, list) or not items:
         raise RuntimeError("Gemini returned no usable scenes.")
-    return [{
-        "id": i, "title": str(item.get("title", f"Scene {i}"))[:140],
-        "narration": str(item.get("narration", ""))[:4500],
-        "visual_prompt": str(item.get("visual_prompt", topic))[:2000],
-        "duration": max(2, min(120, float(item.get("duration", 8)))),
-        "image_path": None, "audio_path": None,
-    } for i, item in enumerate(items[:12], 1)]
+    normalized = []
+    for i, item in enumerate(items[:12], 1):
+        if not isinstance(item, dict):
+            continue
+        try:
+            duration = float(item.get("duration", 8))
+        except (TypeError, ValueError):
+            duration = 8
+        normalized.append({
+            "id": i,
+            "title": str(item.get("title") or f"Scene {i}")[:140],
+            "narration": str(item.get("narration") or "")[:4500],
+            "visual_prompt": str(item.get("visual_prompt") or topic)[:2000],
+            "duration": max(2, min(120, duration)),
+            "image_path": None, "audio_path": None,
+        })
+    if not normalized:
+        raise RuntimeError("Gemini returned scenes in an unsupported format.")
+    return normalized
 
 async def imagen(prompt, path):
     # Try Vertex Imagen first when configured.
