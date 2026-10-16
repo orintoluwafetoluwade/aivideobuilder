@@ -8,7 +8,7 @@ from .config import settings
 from . import db
 from .schemas import ProjectCreate
 from .providers import integrations, storyboard, imagen, tts, render, mirror
-from .youtube import router as youtube_router
+from .youtube import router as youtube_router, upload as youtube_upload
 
 app = FastAPI(title="AI Video Studio API", version="0.1.0",
               description="AI storyboard, image, narration, rendering and YouTube publishing API")
@@ -103,6 +103,16 @@ def render_project(project_id: str, background_tasks: BackgroundTasks):
     db.update(project_id, status="rendering", error=None)
     background_tasks.add_task(render_task, project_id)
     return get_project(project_id)
+
+@app.post("/api/projects/{project_id}/publish")
+def publish_project(project_id: str, privacy_status: str = "private", description: str = ""):
+    project = get_project(project_id)
+    if not project.get("render_url"):
+        raise HTTPException(409, "Render the project before uploading it.")
+    if privacy_status not in {"private", "unlisted", "public"}:
+        raise HTTPException(400, "Invalid privacy status.")
+    path = (Path(settings.render_dir) / Path(project["render_url"]).name).resolve()
+    return youtube_upload(str(path), project["title"], description, privacy_status)
 
 @app.get("/api/projects/{project_id}")
 def project(project_id: str):
