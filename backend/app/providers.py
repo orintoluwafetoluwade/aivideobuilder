@@ -61,28 +61,51 @@ Return ONLY JSON with a scenes array. Each scene has title, narration (spoken wo
     } for i, item in enumerate(items[:12], 1)]
 
 async def imagen(prompt, path):
-    if not settings.google_cloud_project:
-        return False
-    try:
-        from google.auth import default
-        from google.auth.transport.requests import Request
-        credentials, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        credentials.refresh(Request())
-        url = (f"https://{settings.google_cloud_location}-aiplatform.googleapis.com/v1/projects/"
-               f"{settings.google_cloud_project}/locations/{settings.google_cloud_location}/publishers/google/"
-               f"models/{settings.vertex_imagen_model}:predict")
-        async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.post(url, headers={"Authorization": f"Bearer {credentials.token}"},
-                json={"instances": [{"prompt": prompt}], "parameters": {"sampleCount": 1, "aspectRatio": "16:9"}})
-            response.raise_for_status()
-            prediction = response.json()["predictions"][0]
-        encoded = prediction.get("bytesBase64Encoded") or prediction.get("image", {}).get("bytesBase64Encoded")
-        if not encoded:
-            return False
-        path.write_bytes(base64.b64decode(encoded))
-        return True
-    except Exception:
-        return False
+    # Try Vertex Imagen first when configured.
+    if settings.google_cloud_project:
+        try:
+            from google.auth import default
+            from google.auth.transport.requests import Request
+            credentials, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            credentials.refresh(Request())
+            url = (f"https://{settings.google_cloud_location}-aiplatform.googleapis.com/v1/projects/"
+                   f"{settings.google_cloud_project}/locations/{settings.google_cloud_location}/publishers/google/"
+                   f"models/{settings.vertex_imagen_model}:predict")
+            async with httpx.AsyncClient(timeout=120) as client:
+                response = await client.post(url, headers={"Authorization": f"Bearer {credentials.token}"},
+                    json={"instances": [{"prompt": prompt}], "parameters": {"sampleCount": 1, "aspectRatio": "16:9"}})
+                response.raise_for_status()
+                prediction = response.json()["predictions"][0]
+            encoded = prediction.get("bytesBase64Encoded") or prediction.get("image", {}).get("bytesBase64Encoded")
+            if encoded:
+                path.write_bytes(base64.b64decode(encoded))
+                return True
+        except Exception as exc:
+            print(f"Vertex Imagen failed: {exc}", flush=True)
+
+    # Use the existing Gemini API key for image generation; no Vertex credentials needed.
+    if settings.gemini_api_key:
+        try:
+            async with httpx.AsyncClient(timeout=150) as client:
+                response = await client.post(
+                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
+                    headers={"x-goog-api-key": settings.gemini_api_key},
+                    json={"contents": [{"parts": [{"text": (
+                        "Generate one cinematic video storyboard image. No text, lettering, captions or watermark. "
+                        + prompt
+                    )}]}], "generationConfig": {"responseModalities": ["IMAGE", "TEXT"]}},
+                )
+                response.raise_for_status()
+                parts = response.json()["candidates"][0]["content"]["parts"]
+            for part in parts:
+                data = part.get("inlineData") or part.get("inline_data")
+                if data and data.get("data"):
+                    path.write_bytes(base64.b64decode(data["data"]))
+                    return True
+            print("Gemini image API returned no image payload.", flush=True)
+        except Exception as exc:
+            print(f"Gemini image generation failed: {exc}", flush=True)
+    return False
 
 async def tts(text, path):
     if not text.strip():
