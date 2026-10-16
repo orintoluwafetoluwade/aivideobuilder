@@ -1,0 +1,36 @@
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    app_env: str = "development"
+    app_secret: str = "development-only-change-me"
+    database_url: str = "sqlite:///./data/studio.db"
+    cors_origins: str = "http://localhost:5173"
+    media_dir: str = "./media"
+    render_dir: str = "./renders"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    google_cloud_project: str = ""
+    google_cloud_location: str = "us-central1"
+    google_application_credentials: str = ""
+    vertex_imagen_model: str = "imagen-3.0-generate-002"
+    google_tts_api_key: str = ""
+    google_tts_voice: str = "en-US-Neural2-D"
+    firebase_project_id: str = ""
+    firebase_service_account_json: str = ""
+    youtube_client_id: str = ""
+    youtube_client_secret: str = ""
+    youtube_redirect_uri: str = "http://localhost:8000/api/youtube/callback"
+    youtube_token_encryption_key: str = ""
+    frontend_url: str = "http://localhost:5173"
+    max_upload_mb: int = 512
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def cors_list(self) -> list[str]:
+        return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
+
+settings = Settings()
+Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
+Path(settings.render_dir).mkdir(parents=True, exist_ok=True)
+Path("./data").mkdir(exist_ok=True)
