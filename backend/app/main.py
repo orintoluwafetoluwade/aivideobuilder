@@ -23,6 +23,14 @@ app.include_router(youtube_router, prefix="/api")
 @app.on_event("startup")
 def startup():
     db.init_db()
+    # A container restart (including an out-of-memory restart) can interrupt a
+    # background render before it updates the project. Never leave stale jobs
+    # showing "rendering" forever after the API process comes back.
+    with db.connection() as conn:
+        conn.execute(
+            "UPDATE projects SET status='failed', error=?, updated_at=? WHERE status IN ('rendering','generating')",
+            ("Processing was interrupted by a backend restart. Please retry.", datetime.now(timezone.utc).isoformat()),
+        )
 
 def get_project(project_id):
     with db.connection() as conn:
@@ -90,6 +98,7 @@ def render_task(project_id):
         db.update(project_id, status="completed", render_url=url, error=None)
         mirror(get_project(project_id))
     except Exception as exc:
+        print(f"Render failed for project {project_id}: {exc}", flush=True)
         db.update(project_id, status="failed", error=("Render failed: " + str(exc))[:500])
         mirror(get_project(project_id))
 
